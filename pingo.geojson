@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "OBJECTID_1": 1013, "LAT": 65.585476, "LONG_": -174.342819, "MOUND_TYPE": "unspecified", "M_ASL": null, "M_ABASE": 3.0, "MAP_CODE": "q01-23_24", "type_uni": "unspecified", "avgprecip": 519.1667, "avgtemp": -7.0833, "etopo1_ele": 140.0, "pf_type": "Chr", "pf_temp": "-3 - -5" }, "geometry": { "type": "Point", "coordinates": [ -174.342819000759221, 65.585476000677417 ] } },
+{ "type": "Feature", "properties": { "OBJECTID_1": 2060, "LAT": 69.107874, "LONG_": 62.208136, "MOUND_TYPE": "unspecified", "M_ASL": null, "M_ABASE": 5.0, "MAP_CODE": "r41-27_28", "type_uni": "unspecified", "avgprecip": 314.1667, "avgtemp": -8.25, "etopo1_ele": 177.0, "pf_type": "Chr", "pf_temp": "-1 - -3" }, "geometry": { "type": "Point", "coordinates": [ 62.208135999976726, 69.10787400009157 ] } }
+]
+}
