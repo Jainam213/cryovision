@@ -6,6 +6,7 @@ SENTINEL_PASSWORD = "baw.YFV8rfa8nva9mfg"
 SENTINEL_HOST = "https://scihub.copernicus.eu/dhus"
 PLATFORM_NAME = "Sentinel-2"
 
+SENTINAL_DATA_DIR = "sentinel_data"
 
 SHAPEFILE = "pingo_distribution_siberia_ggrosse_bjones/pingo_distribution_siberia_ggrosse_bjones.shp"
 

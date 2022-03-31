@@ -2,24 +2,23 @@ import os
 from sentinelsat import SentinelAPI, read_geojson, geojson_to_wkt, make_path_filter
 import geopandas as gpd
 import rasterio as rio
-import rasterio.mask
 from tqdm import tqdm
 
-from utils.constants import (
-    BUFFER_RADIUS,
+from constants import (
     GEOJSON_PATH,
     IMAGE_FILTER,
     PLATFORM_NAME,
     RGB_FILENAME,
-    RGB_MASKED_FILENAME,
     SENTINEL_HOST,
     SENTINEL_PASSWORD,
     SENTINEL_USERNAME,
     SHAPEFILE,
     TILE_HEIGHT,
     TILE_WIDTH,
+    SENTINAL_DATA_DIR,
 )
-from utils.helpers import get_tiles
+from helpers import get_tiles
+from constants import SENTINAL_DATA_DIR
 
 # Init Sentinel API
 
@@ -31,13 +30,14 @@ pingo = gpd.read_file(SHAPEFILE).to_crs("epsg:4326")
 pingo.to_file(GEOJSON_PATH, driver="GeoJSON")
 
 # Choose a pingo to track
-pingo_number = 1
+pingo_number = 5423
 
 geojson = read_geojson(GEOJSON_PATH)["features"][pingo_number]
 footprint = geojson_to_wkt(geojson)
 
 
 # Get Image Data
+print("Querying API...")
 
 images = api.query(
     footprint,
@@ -56,25 +56,51 @@ path_filter = make_path_filter(IMAGE_FILTER)
 image_id = dataframe_sorted.index[0]
 date = dataframe_sorted.generationdate[0].strftime("%d_%m_%Y")
 
-download_data = api.download(image_id, nodefilter=path_filter)
+print("Downloading Satellite Data...")
+
+download_data = api.download(
+    image_id, nodefilter=path_filter, directory_path=SENTINAL_DATA_DIR
+)
 
 
 # Process Image
 main_path = download_data["node_path"][2:]
 image_paths = list(download_data["nodes"].keys())[1:]
 
-b2 = rio.open(main_path + list(download_data["nodes"].keys())[1:][0][1:])
-b3 = rio.open(main_path + list(download_data["nodes"].keys())[2:][0][1:])
-b4 = rio.open(main_path + list(download_data["nodes"].keys())[3:][0][1:])
+b2 = rio.open(
+    os.path.join(
+        SENTINAL_DATA_DIR, main_path + list(download_data["nodes"].keys())[1:][0][1:]
+    )
+)
+b3 = rio.open(
+    os.path.join(
+        SENTINAL_DATA_DIR, main_path + list(download_data["nodes"].keys())[2:][0][1:]
+    )
+)
+b4 = rio.open(
+    os.path.join(
+        SENTINAL_DATA_DIR, main_path + list(download_data["nodes"].keys())[3:][0][1:]
+    )
+)
 
-os.mkdir(f"images/{image_id}_{date}")
-os.mkdir(f"images/{image_id}_{date}/tiles")
+try:
+    os.mkdir(f"images/{image_id}_{date}")
+    os.mkdir(f"images/{image_id}_{date}/tiles")
+except FileExistsError:
+    pass
 
 in_path = f"images/{image_id}_{date}/"
 out_path = f"images/{image_id}_{date}/tiles/"
 output_filename = "tile_{}-{}.tif"
 
-pingo_projection = pingo.loc[pingo_number:pingo_number].to_crs(b4.crs.data.get("init"))
+if b4.crs:
+    crs_projection = b4.crs.data.get("init")
+else:
+    crs_projection = 32641
+
+pingo_projection = pingo.loc[pingo_number:pingo_number].to_crs(crs_projection)
+
+print("Creating Images...")
 
 with rio.open(
     os.path.join(in_path, RGB_FILENAME),
@@ -92,28 +118,10 @@ with rio.open(
     rgb.write(b4.read(1), 3)
     rgb.close()
 
-# Create Masked Image
-
-with rio.open(os.path.join(in_path, RGB_FILENAME)) as src:
-    out_image, out_transform = rasterio.mask.mask(
-        src, pingo_projection.geometry.buffer(BUFFER_RADIUS), crop=True
-    )
-    out_meta = src.meta.copy()
-    out_meta.update(
-        {
-            "driver": "GTiff",
-            "height": out_image.shape[1],
-            "width": out_image.shape[2],
-            "transform": out_transform,
-        }
-    )
-
-with rio.open(os.path.join(in_path, RGB_MASKED_FILENAME), "w", **out_meta) as dest:
-    dest.write(out_image)
 
 # Create Image tiles
 
-with rio.open(os.path.join(in_path, RGB_MASKED_FILENAME)) as inds:
+with rio.open(os.path.join(in_path, RGB_FILENAME)) as inds:
     tile_width, tile_height = TILE_WIDTH, TILE_HEIGHT
     meta = inds.meta.copy()
     tiles = list(get_tiles(inds))
