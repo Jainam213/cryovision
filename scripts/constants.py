@@ -12,11 +12,13 @@ SHAPEFILE = "pingo_distribution_siberia_ggrosse_bjones/pingo_distribution_siberi
 
 GEOJSON_PATH = "pingo.geojson"
 IMAGE_FILTER = "*_B0[234]_10m.jp2"
-BUFFER_RADIUS = 40000.0
+BUFFER_RADIUS = 20000
 
 TILE_HEIGHT = 256
 TILE_WIDTH = 256
 
 IMAGE_FILENAME = "greyscale_image.tif"
-IMAGE_MASKED_FILENAME = "rgb_masked.tif"
+IMAGE_MASKED_FILENAME = "greyscale_image_masked.tif"
 
+
+CRS = 32641

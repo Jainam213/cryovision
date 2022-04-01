@@ -3,6 +3,8 @@ from sentinelsat import SentinelAPI, read_geojson, geojson_to_wkt, make_path_fil
 import geopandas as gpd
 import rasterio as rio
 from tqdm import tqdm
+import rasterio.mask
+from rasterio.io import MemoryFile
 
 from constants import (
     GEOJSON_PATH,
@@ -16,6 +18,8 @@ from constants import (
     SENTINAL_DATA_DIR,
     PLATFORM_NAME,
     IMAGE_FILENAME,
+    BUFFER_RADIUS,
+    IMAGE_MASKED_FILENAME,
 )
 from helpers import get_tiles
 from constants import SENTINAL_DATA_DIR
@@ -57,13 +61,6 @@ def collect_data():
         image_ids = dataframe_sorted.index
         for image_id in tqdm(image_ids):
 
-            try:
-                os.mkdir(f"images/{image_id}")
-                os.mkdir(f"images/{image_id}/tiles")
-            except FileExistsError:
-                print(f"Image with id: {image_id} alreeady exists in database")
-                continue
-
             print("Downloading Satellite Data...")
             try:
                 download_data = api.download(
@@ -89,12 +86,25 @@ def collect_data():
             in_path = f"images/{image_id}/"
             out_path = f"images/{image_id}/tiles/"
             output_filename = "tile_{}-{}.tif"
+            try:
+                os.mkdir(in_path)
+                os.mkdir(out_path)
+            except FileExistsError:
+                print(f"Image with id: {image_id} alreeady exists in database")
+                continue
+
+            if b4.crs:
+                crs_projection = b4.crs.data.get("init")
+            else:
+                crs_projection = 32641
+
+            pingo_projection = pingo.loc[pingo_number:pingo_number].to_crs(
+                crs_projection
+            )
 
             print("Creating Images...")
 
-            with rio.open(
-                os.path.join(in_path, IMAGE_FILENAME),
-                "w+",
+            image = MemoryFile().open(
                 driver="GTiff",
                 width=b4.width,
                 height=b4.height,
@@ -102,14 +112,35 @@ def collect_data():
                 crs=b4.crs,
                 transform=b4.transform,
                 dtype=b4.dtypes[0],
-            ) as image:
-                greyscale = (b2.read(1) + b3.read(1) + b4.read(1)) / 3
-                image.write(greyscale, 1)
+            )
+
+            greyscale = (b2.read(1) + b3.read(1) + b4.read(1)) / 3
+            image.write(greyscale, 1)
+
+            # Create Masked Image
+
+            out_image, out_transform = rasterio.mask.mask(
+                image, pingo_projection.geometry.buffer(BUFFER_RADIUS), crop=True
+            )
+            out_meta = image.meta.copy()
+            out_meta.update(
+                {
+                    "driver": "GTiff",
+                    "height": out_image.shape[1],
+                    "width": out_image.shape[2],
+                    "transform": out_transform,
+                }
+            )
+
+            with rio.open(
+                os.path.join(in_path, IMAGE_MASKED_FILENAME), "w+", **out_meta
+            ) as masked_image:
+                masked_image.write(out_image)
 
                 # Create Image tiles
 
-                meta = image.meta.copy()
-                tiles = list(get_tiles(image))
+                meta = masked_image.meta.copy()
+                tiles = list(get_tiles(masked_image))
 
                 for window, transform in tqdm(tiles):
                     meta["transform"] = transform
@@ -120,15 +151,14 @@ def collect_data():
                             int(window.col_off), int(window.row_off)
                         ),
                     )
-                    patch = image.read(window=window)
-                    if image.read(window=window).min() > 0 and patch.shape == (
+                    patch = masked_image.read(window=window)
+                    if masked_image.read(window=window).min() > 0 and patch.shape == (
                         1,
                         TILE_WIDTH,
                         TILE_HEIGHT,
                     ):
                         with rio.open(outpath, "w", **meta) as outds:
-                            outds.write(image.read(window=window))
-                image.close()
+                            outds.write(masked_image.read(window=window))
 
 
 if __name__ == "__main__":
