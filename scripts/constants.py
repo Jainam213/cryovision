@@ -11,7 +11,7 @@ SENTINAL_DATA_DIR = "sentinel_data"
 SHAPEFILE = "pingo_distribution_siberia_ggrosse_bjones/pingo_distribution_siberia_ggrosse_bjones.shp"
 
 GEOJSON_PATH = "pingo.geojson"
-IMAGE_FILTER = "*_B0[234]_60m.jp2"
+IMAGE_FILTER = "*_B0[234]_10m.jp2"
 BUFFER_RADIUS = 40000.0
 
 TILE_HEIGHT = 256
