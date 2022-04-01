@@ -17,6 +17,6 @@ BUFFER_RADIUS = 40000.0
 TILE_HEIGHT = 256
 TILE_WIDTH = 256
 
-RGB_FILENAME = "rgb.tif"
-RGB_MASKED_FILENAME = "rgb_masked.tif"
+IMAGE_FILENAME = "greyscale_image.tif"
+IMAGE_MASKED_FILENAME = "rgb_masked.tif"
 

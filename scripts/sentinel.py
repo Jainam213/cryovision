@@ -7,7 +7,6 @@ from tqdm import tqdm
 from constants import (
     GEOJSON_PATH,
     IMAGE_FILTER,
-    RGB_FILENAME,
     SENTINEL_HOST,
     SENTINEL_PASSWORD,
     SENTINEL_USERNAME,
@@ -16,6 +15,7 @@ from constants import (
     TILE_WIDTH,
     SENTINAL_DATA_DIR,
     PLATFORM_NAME,
+    IMAGE_FILENAME,
 )
 from helpers import get_tiles
 from constants import SENTINAL_DATA_DIR
@@ -33,7 +33,7 @@ pingo_count = len(pingo)
 
 
 def collect_data():
-    pingo_count = 1
+    pingo_count = 10
     for pingo_number in tqdm(range(pingo_count)):
         footprint = geojson_to_wkt(geojson["features"][pingo_number])
 
@@ -55,7 +55,6 @@ def collect_data():
         # Download Image Data set using Id, currently only get top result
         path_filter = make_path_filter(IMAGE_FILTER)
         image_ids = dataframe_sorted.index
-        image_ids = image_ids[0:3]
         for image_id in tqdm(image_ids):
 
             try:
@@ -94,44 +93,42 @@ def collect_data():
             print("Creating Images...")
 
             with rio.open(
-                os.path.join(in_path, RGB_FILENAME),
-                "w",
+                os.path.join(in_path, IMAGE_FILENAME),
+                "w+",
                 driver="GTiff",
                 width=b4.width,
                 height=b4.height,
-                count=3,
+                count=1,
                 crs=b4.crs,
                 transform=b4.transform,
                 dtype=b4.dtypes[0],
-            ) as rgb:
-                rgb.write(b2.read(1), 1)
-                rgb.write(b3.read(1), 2)
-                rgb.write(b4.read(1), 3)
-                rgb.close()
+            ) as image:
+                greyscale = (b2.read(1) + b3.read(1) + b4.read(1)) / 3
+                image.write(greyscale, 1)
 
                 # Create Image tiles
 
-                with rio.open(os.path.join(in_path, RGB_FILENAME)) as inds:
-                    meta = inds.meta.copy()
-                    tiles = list(get_tiles(inds))
+                meta = image.meta.copy()
+                tiles = list(get_tiles(image))
 
-                    for window, transform in tqdm(tiles):
-                        meta["transform"] = transform
-                        meta["width"], meta["height"] = window.width, window.height
-                        outpath = os.path.join(
-                            out_path,
-                            output_filename.format(
-                                int(window.col_off), int(window.row_off)
-                            ),
-                        )
-                        patch = inds.read(window=window)
-                        if inds.read(window=window).min() > 0 and patch.shape == (
-                            3,
-                            TILE_WIDTH,
-                            TILE_HEIGHT,
-                        ):
-                            with rio.open(outpath, "w", **meta) as outds:
-                                outds.write(inds.read(window=window))
+                for window, transform in tqdm(tiles):
+                    meta["transform"] = transform
+                    meta["width"], meta["height"] = window.width, window.height
+                    outpath = os.path.join(
+                        out_path,
+                        output_filename.format(
+                            int(window.col_off), int(window.row_off)
+                        ),
+                    )
+                    patch = image.read(window=window)
+                    if image.read(window=window).min() > 0 and patch.shape == (
+                        1,
+                        TILE_WIDTH,
+                        TILE_HEIGHT,
+                    ):
+                        with rio.open(outpath, "w", **meta) as outds:
+                            outds.write(image.read(window=window))
+                image.close()
 
 
 if __name__ == "__main__":
