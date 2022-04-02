@@ -5,6 +5,7 @@ import rasterio as rio
 from tqdm import tqdm
 import rasterio.mask
 from rasterio.io import MemoryFile
+import shutil
 
 from constants import (
     GEOJSON_PATH,
@@ -17,7 +18,6 @@ from constants import (
     TILE_WIDTH,
     SENTINAL_DATA_DIR,
     PLATFORM_NAME,
-    IMAGE_FILENAME,
     BUFFER_RADIUS,
     IMAGE_MASKED_FILENAME,
 )
@@ -37,7 +37,6 @@ pingo_count = len(pingo)
 
 
 def collect_data():
-    pingo_count = 10
     for pingo_number in tqdm(range(pingo_count)):
         footprint = geojson_to_wkt(geojson["features"][pingo_number])
 
@@ -61,6 +60,16 @@ def collect_data():
         image_ids = dataframe_sorted.index
         for image_id in tqdm(image_ids):
 
+            in_path = f"images/{image_id}/"
+            out_path = f"images/{image_id}/tiles/"
+            output_filename = "tile_{}-{}.tif"
+            try:
+                os.mkdir(in_path)
+                os.mkdir(out_path)
+            except FileExistsError:
+                print(f"Image with id: {image_id} alreeady exists in database")
+                continue
+
             print("Downloading Satellite Data...")
             try:
                 download_data = api.download(
@@ -68,7 +77,7 @@ def collect_data():
                 )
             except Exception as e:
                 print(e)
-                continue
+                break
             # Process Image
             main_path = download_data["node_path"][2:]
             image_paths = list(download_data["nodes"].keys())
@@ -82,16 +91,6 @@ def collect_data():
             b4 = rio.open(
                 os.path.join(SENTINAL_DATA_DIR, main_path + image_paths[3:][0][1:],)
             )
-
-            in_path = f"images/{image_id}/"
-            out_path = f"images/{image_id}/tiles/"
-            output_filename = "tile_{}-{}.tif"
-            try:
-                os.mkdir(in_path)
-                os.mkdir(out_path)
-            except FileExistsError:
-                print(f"Image with id: {image_id} alreeady exists in database")
-                continue
 
             if b4.crs:
                 crs_projection = b4.crs.data.get("init")
@@ -159,6 +158,8 @@ def collect_data():
                     ):
                         with rio.open(outpath, "w", **meta) as outds:
                             outds.write(masked_image.read(window=window))
+
+            shutil.rmtree(os.path.join(SENTINAL_DATA_DIR, main_path))
 
 
 if __name__ == "__main__":
